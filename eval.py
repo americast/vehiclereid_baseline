@@ -23,7 +23,9 @@ from torch.autograd import Variable
 import math
 from networks.resnet import resnet50, resnet101
 from dataset.dataset import VeriDataset
+import pudb
 
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 parser = argparse.ArgumentParser(description='PyTorch Relationship')
 
@@ -55,7 +57,7 @@ parser.add_argument('--TopK',default=100, type=int,
 
 def get_dataset(dataset_name, query_dir, query_list, gallery_dir, gallery_list):
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+                                     std=[0.229, 0.224, 0.225])                     
     scale_size = args.scale_size
     crop_size = args.crop_size
 
@@ -107,6 +109,7 @@ def main():
             print ('!!!load weights success !!! path is ', args.weights)
         except Exception as e:
             print ('!!!load weights failed !!! path is ', args.weights)
+            print("Reason: " + str(e))
             return
     else:
         print('!!!Load Weights PATH ERROR!!!')
@@ -138,11 +141,12 @@ def evaluate(query_loader, gallery_loader, model):
     for i, (image, pid, camid) in enumerate(query_loader):
         # if i == 10:
         #     break
-        print('Extracting feature of image '+'%d:'%i)
+        print('Extracting feature of image '+'%d:' %i)
         query_pids.append(pid)
         query_camids.append(camid)
         image = torch.autograd.Variable(image).cuda()
         output, feat = model(image)
+        # pu.db
         query_feats.append(feat.data.cpu())
         queryN = queryN+1
 

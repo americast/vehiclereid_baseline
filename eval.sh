@@ -10,5 +10,5 @@ galleryList_veri="./list/veri_test_list.txt"
 # Number of classes
 num_veri=576
 
-CUDA_VISIBLE_DEVICES=1 python -u eval.py $queryPath_veri $queryList_veri $galleryPath_veri $galleryList_veri --dataset veri --backbone resnet50 --weights './models/resnet50/Car_epoch_50.pth' --save_dir './results/veri/resnet50/'
+/nethome/ssinha97/anaconda3.7/bin/python3.7 -u eval.py $queryPath_veri $queryList_veri $galleryPath_veri $galleryList_veri --dataset veri --backbone resnet101 --weights './models/resnet101/Car_epoch_150.pth' --save_dir './results/veri/resnet101/'
 

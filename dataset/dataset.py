@@ -6,6 +6,7 @@ import numpy as np
 import cv2
 import json
 import random
+import pudb
 
 class VeriDataset(data.Dataset):
     def __init__(self, data_dir, train_list, train_data_transform = None, is_train= True ):
@@ -21,10 +22,11 @@ class VeriDataset(data.Dataset):
         self.cams = []
         if is_train == True:
             for line in lines:
-                line = line.strip().split(' ')
-                self.names.append(line[0])
-                self.labels.append(line[1])
-                self.cams.append(line[0].strip().split('_')[1])
+                line = line.strip().split('/')
+                print("line: "+str(line))
+                self.names.append(line[0]+"/"+line[1])
+                self.labels.append(line[0])
+                self.cams.append(-1)
         else:
             for line in lines:
                 line = line.strip()
@@ -36,7 +38,9 @@ class VeriDataset(data.Dataset):
     def __getitem__(self, index):
         # For normalize
 
-        img = Image.open(os.path.join(self.data_dir, self.names[index])).convert('RGB') # convert gray to rgb
+        
+        img = Image.open(os.path.join(self.data_dir, self.names[index]+".jpg")).convert('RGB') # convert gray to rgb
+        # pu.db
         target = int(self.labels[index])
         camid = self.cams[index]
 

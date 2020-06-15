@@ -23,7 +23,7 @@ import os.path as osp
 from torch.autograd import Variable
 import math
 from networks.resnet import resnet50, resnet101
-from dataset.dataset import VeriDataset, AicDataset
+from dataset.dataset import VeriDataset
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
