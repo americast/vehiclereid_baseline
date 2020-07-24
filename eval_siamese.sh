@@ -10,5 +10,5 @@ galleryList_veri="./data/VeRi_wild/train_test_split/test_3000.txt"
 # Number of classes
 num_veri=40672
 
-python -u eval.py $queryPath_veri $queryList_veri $galleryPath_veri $galleryList_veri -n $num_veri --dataset veri --backbone resnet50 --weights './models/resnet50/Car_epoch_200.pth' --save_dir './results/wild/resnet50/'
+/nethome/ssinha97/anaconda3.7/bin/python3.7 -u eval_siamese.py $queryPath_veri $queryList_veri $galleryPath_veri $galleryList_veri -n $num_veri --dataset veri --batch_size 96 --backbone siamese --weights './models/siamese_trial/Car_epoch_200.pth' --save_dir './results/wild/siamese_trial/'
 

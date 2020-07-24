@@ -24,6 +24,9 @@ import math
 from networks.resnet import resnet50, resnet101
 from dataset.dataset import VeriDataset
 import pudb
+import util
+from tqdm import tqdm
+import itertools
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -98,8 +101,11 @@ def main():
         model = resnet50(num_classes=args.num_classes)
     elif args.backbone == 'resnet101':
         model = resnet101(num_classes=args.num_classes)
+    elif args.backbone == 'siamese':
+        model = util.siamese_model()
     
-    print(args.weights)
+    # print(args.weights)
+    print(args.backbone)
 
     if args.weights != '':
         try:
@@ -137,16 +143,17 @@ def evaluate(query_loader, gallery_loader, model):
     model.eval()
 
     print('Processing query set...')
-    queryN = 0
+    queryN = 0      
+    print("Total: "+str(len(query_loader)))
     for i, (image, pid, camid) in enumerate(query_loader):
         # if i == 10:
         #     break
-        print('Extracting feature of image '+'%d:' %i)
+        print('Extracting feature of image '+'%d of %d:' %(i+1,len(query_loader)))
         query_pids.append(pid)
         query_camids.append(camid)
         image = torch.autograd.Variable(image).cuda()
-        output, feat = model(image)
-        # pu.db
+        output, feat = model((image, image))
+        feat = feat[0]
         query_feats.append(feat.data.cpu())
         queryN = queryN+1
 
@@ -155,22 +162,25 @@ def evaluate(query_loader, gallery_loader, model):
     print('Processing query set... \tTime[{0:.3f}]'.format(query_time))
 
     print('Processing gallery set...')
+    print("Total: "+str(len(gallery_loader)))
     galleryN = 0
     for i, (image, pid, camid) in enumerate(gallery_loader):
-        # if i == 20:
-        #     break
-        print('Extracting feature of image '+'%d:'%i)
+        print('Extracting feature of image '+'%d of %d:'%(i+1,len(gallery_loader)))
         gallery_pids.append(pid)
         gallery_camids.append(camid)
         image = torch.autograd.Variable(image).cuda()
-        output, feat = model(image)
+        try:
+            output, feat = model((image, image))
+        except:
+            continue
+        feat = feat[0]
         gallery_feats.append(feat.data.cpu())
         galleryN = galleryN+1
 
     gallery_time = time.time()-end
     print('Processing gallery set... \tTime[{0:.3f}]'.format(gallery_time))
     print('Computing CMC and mAP...')
-    cmc, mAP, distmat = compute(query_feats, query_pids, query_camids, gallery_feats, gallery_pids, gallery_camids)
+    cmc, mAP, distmat = compute(query_feats, query_pids, query_camids, gallery_feats, gallery_pids, gallery_camids, model)
     print('Saving distmat...')
     np.save(args.save_dir+'distmat.npy', np.asarray(distmat))
     np.savetxt(args.save_dir+'distmat.txt', np.asarray(distmat), fmt='%.4f')
@@ -180,26 +190,40 @@ def evaluate(query_loader, gallery_loader, model):
     f.write('mAP = '+'%.4f'%mAP+'\tRank-1 = '+'%.4f'%cmc[0]+'\n')
     f.close()
 
-def compute(query_feats, query_pids, query_camids, gallery_feats, gallery_pids, gallery_camids):
+def compute(query_feats, query_pids, query_camids, gallery_feats, gallery_pids, gallery_camids, model):
     # query
-    qf = torch.cat(query_feats, dim=0)
+    qf = torch.cat(query_feats, dim=0).cuda()
+    q_pids_all = list(itertools.chain.from_iterable(query_pids))
+    q_pids = np.asarray(torch.tensor(q_pids_all))
 
-    q_pids = np.asarray(query_pids)
-    q_camids = np.asarray(query_camids).T
+    q_camids_all = list(itertools.chain.from_iterable(query_camids))
+    q_camids = np.asarray(q_camids_all).T
 
     # gallery
-    gf = torch.cat(gallery_feats, dim=0)
-    g_pids = np.asarray(gallery_pids)
-    g_camids = np.asarray(gallery_camids).T
+    gf = torch.cat(gallery_feats, dim=0).cuda()
+    g_pids_all = list(itertools.chain.from_iterable(gallery_pids))
+    g_pids = np.asarray(torch.tensor(g_pids_all))
+
+    g_camids_all = list(itertools.chain.from_iterable(gallery_camids))
+    g_camids = np.asarray(g_camids_all).T
 
     m, n = qf.shape[0], gf.shape[0]
     qf = qf.view(m, -1)
     gf = gf.view(n, -1)
     print('Saving feature mat...')
-    np.save(args.save_dir+'queryFeat.npy', qf)
-    np.save(args.save_dir+'galleryFeat.npy', gf)
-    distmat = torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, n) + torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, m).t()
-    distmat.addmm_(1, -2, qf, gf.t())
+    np.save(args.save_dir+'queryFeat.npy', qf.cpu().numpy())
+    np.save(args.save_dir+'galleryFeat.npy', gf.cpu().numpy())
+    # distmat = torch.pow(qf, 2).sum(dim=1, keepdim=True).expand(m, n) + torch.pow(gf, 2).sum(dim=1, keepdim=True).expand(n, m).t()
+    # distmat.addmm_(1, -2, qf, gf.t())
+    distmat = torch.zeros((m, n))
+    model.eval()
+    for j in tqdm(range(m)):
+        qf_here = qf[j, :]
+        qf_here = qf_here.expand(n, -1)
+        res = model((None, None), feat_in = (qf_here, gf))[0][:,0] 
+        distmat[j] = res.cpu().detach()
+
+
     distmat = distmat.cpu().numpy()
 
     q_camids = np.squeeze(q_camids)
